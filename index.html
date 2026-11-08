@@ -1,5 +1,3 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
 <title>Dave the Viking</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
@@ -100,7 +98,7 @@ form.cmd input:focus { outline: 2px solid var(--gold); outline-offset: 0; }
 }
 </style>
 
-</head><body><main class="screen" id="screen">
+<main class="screen" id="screen">
   <div class="pic" id="pic" title="Tap to finish drawing"><img id="pimg" alt="" hidden><svg id="svg" viewBox="0 0 320 200" role="img" aria-label="Picture of the scene"><g id="art" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"></g></svg><div id="ph" hidden></div><div class="cap" id="cap"></div></div>
   <div class="story" id="story" aria-live="polite"></div>
   <aside class="pack" id="pack" aria-label="Inventory"></aside>
@@ -115,7 +113,7 @@ form.cmd input:focus { outline: 2px solid var(--gold); outline-offset: 0; }
       <p class="kicker">A TEXT ADVENTURE IN THE OLD STYLE</p>
       <p class="blurb">Burnt dinners, terrible music and one very missing chest. Type what you want Dave to do, and tap Hint if you get stuck.</p>
       <div class="row"><button class="btn" id="startBtn" type="button">Start the adventure</button><button class="btn alt" id="contBtn" type="button" hidden>Carry on</button></div>
-      <p class="fine"><button class="btn alt tiny" id="tuneBtn" type="button">&#9834; Hear the tune</button></p>
+      <p class="fine"><button class="btn alt tiny" id="tuneBtn" type="button">&#9834; Hear the tune</button> <button class="btn alt tiny" id="fsBtn" type="button" hidden>&#x26F6; Full screen</button></p>
       <p class="fine">Your game saves itself after every move, so you can stop and carry on whenever you like.</p>
     </div>
   </section>
@@ -2176,6 +2174,7 @@ ART.wreck.img='data:image/webp;base64,UklGRkRFAgBXRUJQVlA4IDhFAgAQWQadASoABC8CPo
       const gp0 = document.createElement('span'); gp0.className = 'gap'; bar.appendChild(gp0);
       const m0 = document.createElement('button'); m0.type = 'button'; m0.className = 'btn alt'; m0.textContent = 'Menu'; m0.dataset.cmd = '@menu'; bar.appendChild(m0);
       const m1 = document.createElement('button'); m1.type = 'button'; m1.className = 'btn alt'; m1.textContent = SFX.muted ? 'Sound: off' : 'Sound: on'; m1.dataset.cmd = '@snd'; bar.appendChild(m1);
+      if (FS.ok) { const m2 = document.createElement('button'); m2.type = 'button'; m2.className = 'btn alt'; m2.textContent = FS.on() ? 'Exit full screen' : 'Full screen'; m2.dataset.cmd = '@fs'; bar.appendChild(m2); }
       return;
     }
     $('form').hidden = false;
@@ -2191,6 +2190,7 @@ ART.wreck.img='data:image/webp;base64,UklGRkRFAgBXRUJQVlA4IDhFAgAQWQadASoABC8CPo
     const inv = mk('Pack', '@pack', true); inv.id = 'invBtn';
     mk('Menu', '@menu', true);
     mk(SFX.muted ? 'Sound: off' : 'Sound: on', '@snd', true);
+    if (FS.ok) mk(FS.on() ? 'Exit full screen' : 'Full screen', '@fs', true);
   }
   function autosave() { store.set(AUTO, g.serialize()); }
 
@@ -2274,6 +2274,29 @@ ART.wreck.img='data:image/webp;base64,UklGRkRFAgBXRUJQVlA4IDhFAgAQWQadASoABC8CPo
     SFX.unlock(); SFX.stopTune(); SFX.play('sting'); SFX.setRoom(g.st.room);
   }
 
+  /* ----- full screen ----- */
+  const FS = (() => {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    const on = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+    const ok = !!req && (document.fullscreenEnabled !== false || document.webkitFullscreenEnabled === true);
+    function note(msg) { addLines([msg], 'sys'); }
+    function toggle() {
+      try {
+        if (on()) { const p = exit.call(document); if (p && p.catch) p.catch(() => {}); return; }
+        let told = false; const tell = () => { if (!told && !on()) { told = true; note('This page is not allowed to go full screen here. Press F11, or open the game file straight in the browser.'); } };
+        const p = req.call(el, { navigationUI: 'hide' });
+        if (p && p.catch) p.catch(tell);
+        setTimeout(tell, 1500);
+      } catch (e) { note('This page is not allowed to go full screen here. Press F11, or open the game file straight in the browser.'); }
+    }
+    return { ok, on, toggle };
+  })();
+  const fsSync = () => { renderPanels(); const b = $('fsBtn'); if (b) b.innerHTML = FS.on() ? '&#x26F6; Exit full screen' : '&#x26F6; Full screen'; };
+  document.addEventListener('fullscreenchange', fsSync); document.addEventListener('webkitfullscreenchange', fsSync);
+  if (FS.ok) { $('fsBtn').hidden = false; $('fsBtn').onclick = () => FS.toggle(); }
+
   /* ----- wiring ----- */
   $('form').addEventListener('submit', e => { e.preventDefault(); const v = input.value; input.value = ''; run(v); input.focus(); });
   input.addEventListener('keydown', e => {
@@ -2285,6 +2308,7 @@ ART.wreck.img='data:image/webp;base64,UklGRkRFAgBXRUJQVlA4IDhFAgAQWQadASoABC8CPo
     const b = e.target.closest('button'); if (!b) return;
     const c = b.dataset.cmd;
     if (c === '@snd') { SFX.unlock(); SFX.setMuted(!SFX.muted); if (!SFX.muted) { SFX.setRoom(g.st.room); SFX.play('send'); } renderPanels(); }
+    else if (c === '@fs') FS.toggle();
     else if (c === '@menu') openMenu(); else if (c === '@pack') $('drawer').hidden = !$('drawer').hidden; else { $('drawer').hidden = true; run(c); }
   });
   const pickItem = e => {
@@ -2321,5 +2345,3 @@ ART.wreck.img='data:image/webp;base64,UklGRkRFAgBXRUJQVlA4IDhFAgAQWQadASoABC8CPo
   if (window.claude && window.claude.hot && window.claude.hot.snapshot) { /* no live state to preserve beyond localStorage */ }
 })();
 </script>
-
-</body></html>
